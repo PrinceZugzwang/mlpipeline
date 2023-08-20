@@ -1,5 +1,5 @@
-# Use an official Python runtime as a parent image
-FROM python:3.8-slim
+# Use the official Python image with Debian (includes Python)
+FROM python:3.8-slim-buster
 
 # Set the working directory to /app
 WORKDIR /app
@@ -10,13 +10,11 @@ COPY . /app
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install OpenJDK 11
+RUN apt-get update && apt-get install -y openjdk-11-jre
+
 # Expose port 8501
 EXPOSE 8501
 
 # Run app.py when the container launches
 CMD ["streamlit", "run", "app.py"]
-
-# syntax=docker/dockerfile:1
-FROM alpine:3.16.0
-RUN apk add --no-cache java-cacerts openjdk17-jdk
-
