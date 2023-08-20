@@ -10,9 +10,9 @@ COPY . /app
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Java (required for H2O)
-RUN apt-get update && \
-    apt-get install -y openjdk-11-jre
+FROM eclipse-temurin:11
+RUN mkdir /opt/app
+COPY japp.jar /opt/app
 
 # Expose port 8501
 EXPOSE 8501
