@@ -10,9 +10,9 @@ COPY . /app
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-FROM eclipse-temurin:11
-RUN mkdir /opt/app
-COPY japp.jar /opt/app
+# syntax=docker/dockerfile:1
+FROM alpine:3.16.0
+RUN apk add --no-cache java-cacerts openjdk17-jdk
 
 # Expose port 8501
 EXPOSE 8501
