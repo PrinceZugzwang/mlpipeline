@@ -1,73 +1,76 @@
 import streamlit as st
 import pandas as pd
 import os
-import h2o
-from h2o.automl import H2OAutoML
-import matplotlib
-# import sweetviz as sv
+from tpot import TPOTClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import joblib
 
+# Streamlit Sidebar
 with st.sidebar:
-    st.title("TradeSynth Analytics")
-    choice = st.radio("Navigation", ["Upload", "Profiling", "ML", "Download", "Predictions"])
-    st.info("This app allows you to build an Automated ML Pipeline!")
+  st.title("TradeSynth Analytics")
+  choice = st.radio("Navigation", ["Upload", "ML"])
 
+# Load Data
 if os.path.exists("sourcedata.csv"):
-    df = pd.read_csv("sourcedata.csv", index_col = None)
+  df = pd.read_csv("sourcedata.csv", index_col=None)
+
+# Streamlit Logic
 if choice == "Upload":
-    st.title("Upload a dataset for modelling")
-    file = st.file_uploader("Please upload your dataset")
-    if file:
-        df = pd.read_csv(file, index_col=None)
-        df.to_csv("sourcedata.csv", index=None)
-        st.dataframe(df)
-         
-
-# if choice == "Profiling":
-    # st.title("Explore the Data with Automated Analysis!")
-    # profile_report = sv.analyze(df, title="Profiling Report")
-    # profile_report.show_html()
-
+  st.title("Upload a dataset for modelling")
+  file = st.file_uploader("Please upload your dataset")
+  if file:
+    df = pd.read_csv(file, index_col=None)
+    df.to_csv("sourcedata.csv", index=None)
+    st.dataframe(df)
 
 if choice == "ML":
-    st.title("Applying Machine Learning!")
-    target = st.selectbox("Select Your Target", df.columns)
-    h2o.init()
-    if st.button("Train Model"):
-        df = h2o.H2OFrame(df)
-        st.info("done1")
-        aml = H2OAutoML(max_models =25,
-                    balance_classes=True,
-                    seed = 1)
-        st.info("done2")
-        # modeling and training
-        aml.train(training_frame = df, y = target)
-        st.info("done3")
-        lb = aml.leaderboard
-        st.info("This is how different models performed")
-        lb.head(rows=lb.nrows)
-        # generate best model
-        best_model = aml.get_best_model()
-        st.info("This is your best model for the situation")
-        print(best_model)
-        h2o.save_model(best_model, "best_model")
+  st.title("Applying Machine Learning!")
+  target = st.selectbox("Select Your Target", df.columns)
 
-if choice == "Download":
-    with open("best_model.pkl", "rb") as f:
-        st.download_button("Download the Model", f, "best_model.pkl")
+  if target == "":
+    st.warning("Please select a target column before proceeding.")
+  else:
+    # Drop the target column before performing one-hot encoding
+    X = df.drop(columns=[target])
+    y = df[target]
 
-if choice == "Predictions":
-    st.title("Upload a dataset for making predictions on")
-    file = st.file_uploader("Please upload your dataset")
-    if file:
-        test = pd.read_csv(file, index_col=None)
-        test.to_csv("testdata.csv", index=None)
-        st.dataframe(test)
-        preds = aml.predict(test)
-        test.reset_index(drop=True, inplace=True)
-        preds.reset_index(drop=True, inplace=True)
-        findf = pd.concat([test,preds], axis=1)
-        st.info(findf)
+    # Drop 'warnings' column before one-hot encoding
+    if 'warnings' in X.columns:
+      X = X.drop(columns=['warnings'])
 
+    # Perform one-hot encoding for categorical variables
+    X_encoded = pd.get_dummies(
+      X, columns=X.select_dtypes(include='object').columns, drop_first=True)
+
+    # Train-Test Split
+    X_train, X_test, y_train, y_test = train_test_split(X_encoded,
+                                                        y,
+                                                        test_size=0.2,
+                                                        random_state=1)
+
+    # Automated Model Selection with TPOT
+    tpot = TPOTClassifier(generations=5,
+                          population_size=20,
+                          verbosity=2,
+                          random_state=1,
+                          config_dict='TPOT sparse')
+    tpot.fit(X_train, y_train)
+
+    # Model Evaluation
+    y_pred = tpot.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    st.info(f"Accuracy: {accuracy:.2f}")
+
+    # Show leaderboard with model performances
+    leaderboard = tpot._pareto_front_df(X_test, y_test, subsample_size=None)
+    st.info("Model Leaderboard:")
+    st.dataframe(leaderboard)
+
+    # Save and Download Best Model
+    joblib.dump(tpot.fitted_pipeline_, 'best_model.pkl')
+    with open('best_model.pkl', 'rb') as f:
+      st.download_button("Download the Model", f, "best_model.pkl")
 
 
 
