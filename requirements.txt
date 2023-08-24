@@ -2,3 +2,4 @@ streamlit
 pandas
 h2o
 matplotlib
+tpot
