@@ -63,9 +63,11 @@ if choice == "ML":
     st.info(f"Accuracy: {accuracy:.2f}")
 
     # Show leaderboard with model performances
-    leaderboard = tpot._pareto_front_df(X_test, y_test, subsample_size=None)
-    st.info("Model Leaderboard:")
-    st.dataframe(leaderboard)
+    leaderboard = pd.DataFrame({
+        "Score": [entry["internal_cv_score"] for entry in tpot.evaluated_individuals_],
+        "Model": [entry["pipeline"] for entry in tpot.evaluated_individuals_]
+    })
+    leaderboard = leaderboard.sort_values(by="Score", ascending=False)
 
     # Save and Download Best Model
     joblib.dump(tpot.fitted_pipeline_, 'best_model.pkl')
